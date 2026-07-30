@@ -14,6 +14,9 @@ jobs:
           python -m pip install pygbag
           python -m pygbag --build $GITHUB_WORKSPACE/main.py
 
+      - name: Desactivar Jekyll (imprescindible para servir JS/WASM correctamente)
+        run: touch $GITHUB_WORKSPACE/build/web/.nojekyll
+
       - name: Publicar en la rama gh-pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
