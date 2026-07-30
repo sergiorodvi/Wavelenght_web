@@ -188,10 +188,29 @@ class CampoTexto:
 class JuegoWavelength:
     def __init__(self):
         pygame.init()
+
+        # En pantallas HiDPI/Retina (típico en móviles, devicePixelRatio 2 o 3)
+        # el lienzo se ve borroso si lo dibujamos a la misma resolución "CSS"
+        # que ocupa en pantalla: el navegador lo estira para rellenar los
+        # píxeles físicos reales. Pedimos más resolución interna en esos casos
+        # para que se vea nítido (el tamaño en pantalla no cambia, solo la
+        # nitidez). En PC (devicePixelRatio normalmente 1) no afecta.
+        dpr = 1.0
+        if sys.platform in ("emscripten", "wasi"):
+            try:
+                from platform import window
+                dpr = float(window.devicePixelRatio) or 1.0
+            except Exception:
+                dpr = 1.0
+        dpr = min(dpr, 2.0)  # tope en 2x para no disparar el coste de renderizado
+
+        base_w, base_h = 1280, 844
         # En navegador no existe el concepto de "resolución de escritorio",
         # así que fijamos un tamaño de ventana concreto (misma proporción que
         # el tablero, 1440x950) en vez de pedir pantalla completa con (0, 0).
-        self.screen = pygame.display.set_mode((1280, 844), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode(
+            (int(base_w * dpr), int(base_h * dpr)), pygame.RESIZABLE
+        )
         pygame.display.set_caption("Wavelength")
         self.base_surface = pygame.Surface((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
