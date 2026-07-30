@@ -258,9 +258,7 @@ class JuegoWavelength:
 
         self.btn_empezar.draw(self.base_surface)
 
-        scaled = pygame.transform.smoothscale(self.base_surface, self.screen.get_size())
-        self.screen.blit(scaled, (0, 0))
-        pygame.display.flip()
+        self._blit_a_pantalla()
 
     def handle_setup_event(self, event, pos_img):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -405,8 +403,26 @@ class JuegoWavelength:
                 self.btn_continuar.texto = "SIGUIENTE EQUIPO"
             self.btn_continuar.draw(self.base_surface)
 
-        scaled = pygame.transform.smoothscale(self.base_surface, self.screen.get_size())
-        self.screen.blit(scaled, (0, 0))
+        self._blit_a_pantalla()
+
+    def _calcular_escala(self):
+        """Calcula el factor de escala y el desplazamiento (offset) para dibujar
+        la superficie base (WIDTH x HEIGHT) centrada dentro de la ventana real,
+        SIN deformar la proporción (letterboxing: añade barras si hace falta)."""
+        ww, wh = self.screen.get_size()
+        escala = min(ww / WIDTH, wh / HEIGHT)
+        nuevo_w, nuevo_h = int(WIDTH * escala), int(HEIGHT * escala)
+        off_x = (ww - nuevo_w) // 2
+        off_y = (wh - nuevo_h) // 2
+        return escala, nuevo_w, nuevo_h, off_x, off_y
+
+    def _blit_a_pantalla(self):
+        """Escala la superficie base manteniendo proporción y la centra en la
+        ventana, rellenando el resto con negro (evita el estiramiento)."""
+        escala, nuevo_w, nuevo_h, off_x, off_y = self._calcular_escala()
+        scaled = pygame.transform.smoothscale(self.base_surface, (nuevo_w, nuevo_h))
+        self.screen.fill((0, 0, 0))
+        self.screen.blit(scaled, (off_x, off_y))
         pygame.display.flip()
 
     def render_text_centered(self, text, font, color, y):
@@ -431,10 +447,13 @@ class JuegoWavelength:
 
     def _pos_a_coords_imagen(self, pos):
         """Convierte una posición de pantalla (mouse/touch) a coordenadas de la
-        superficie base (WIDTH x HEIGHT), teniendo en cuenta el escalado."""
+        superficie base (WIDTH x HEIGHT), teniendo en cuenta el letterboxing
+        (offset) y el factor de escala real."""
         mx, my = pos
-        ww, wh = self.screen.get_size()
-        return mx * (WIDTH / ww), my * (HEIGHT / wh)
+        escala, _, _, off_x, off_y = self._calcular_escala()
+        imx = (mx - off_x) / escala
+        imy = (my - off_y) / escala
+        return imx, imy
 
     async def run(self):
         dragging = False
