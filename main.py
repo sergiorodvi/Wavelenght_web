@@ -205,7 +205,7 @@ class JuegoWavelength:
                 dpr = float(window.devicePixelRatio) or 1.0
                 css_w = float(window.innerWidth)
                 css_h = float(window.innerHeight)
-                dpr_usado = min(dpr, 2.0)
+                dpr_usado = min(dpr, 3.0)
                 base_w, base_h = css_w, css_h
                 self.debug_info = (
                     f"dpr={dpr:.2f} (usado={dpr_usado:.2f}) "
@@ -456,10 +456,14 @@ class JuegoWavelength:
         self.screen.blit(scaled, (off_x, off_y))
 
         # --- DEBUG TEMPORAL: quitar en cuanto quede claro el problema de nitidez ---
-        debug_txt = f"{self.debug_info} | screen.get_size()={self.screen.get_size()}"
-        debug_surf = self.font_small.render(debug_txt, True, (0, 255, 0))
-        pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, debug_surf.get_width() + 10, 30))
-        self.screen.blit(debug_surf, (5, 5))
+        if not hasattr(self, '_debug_font'):
+            self._debug_font = pygame.font.Font(FONT_REG_PATH, 15)
+        linea1 = self.debug_info
+        linea2 = f"screen.get_size()={self.screen.get_size()}"
+        for i, linea in enumerate([linea1, linea2]):
+            debug_surf = self._debug_font.render(linea, True, (0, 255, 0))
+            pygame.draw.rect(self.screen, (0, 0, 0), (0, i*20, debug_surf.get_width() + 10, 20))
+            self.screen.blit(debug_surf, (5, i*20 + 2))
         # --- FIN DEBUG TEMPORAL ---
 
         pygame.display.flip()
