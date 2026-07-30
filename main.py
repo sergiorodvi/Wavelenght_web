@@ -192,24 +192,36 @@ class JuegoWavelength:
         # En pantallas HiDPI/Retina (típico en móviles, devicePixelRatio 2 o 3)
         # el lienzo se ve borroso si lo dibujamos a la misma resolución "CSS"
         # que ocupa en pantalla: el navegador lo estira para rellenar los
-        # píxeles físicos reales. Pedimos más resolución interna en esos casos
-        # para que se vea nítido (el tamaño en pantalla no cambia, solo la
-        # nitidez). En PC (devicePixelRatio normalmente 1) no afecta.
+        # píxeles físicos reales. Además, un tamaño fijo adivinado (1280x844)
+        # puede no tener nada que ver con el hueco real disponible en el
+        # navegador del móvil. Así que consultamos el tamaño real del viewport
+        # y el devicePixelRatio reales a través del puente de pygbag.
+        self.debug_info = "no-web (dpr no aplica)"
         dpr = 1.0
+        base_w, base_h = 1280, 844
         if sys.platform in ("emscripten", "wasi"):
             try:
                 from platform import window
                 dpr = float(window.devicePixelRatio) or 1.0
-            except Exception:
+                css_w = float(window.innerWidth)
+                css_h = float(window.innerHeight)
+                dpr_usado = min(dpr, 2.0)
+                base_w, base_h = css_w, css_h
+                self.debug_info = (
+                    f"dpr={dpr:.2f} (usado={dpr_usado:.2f}) "
+                    f"viewport_css={int(css_w)}x{int(css_h)} "
+                    f"-> canvas={int(css_w*dpr_usado)}x{int(css_h*dpr_usado)}"
+                )
+                dpr = dpr_usado
+            except Exception as e:
+                self.debug_info = f"error leyendo window: {e!r}"
                 dpr = 1.0
-        dpr = min(dpr, 2.0)  # tope en 2x para no disparar el coste de renderizado
 
-        base_w, base_h = 1280, 844
         # En navegador no existe el concepto de "resolución de escritorio",
         # así que fijamos un tamaño de ventana concreto (misma proporción que
         # el tablero, 1440x950) en vez de pedir pantalla completa con (0, 0).
         self.screen = pygame.display.set_mode(
-            (int(base_w * dpr), int(base_h * dpr)), pygame.RESIZABLE
+            (max(320, int(base_w * dpr)), max(240, int(base_h * dpr))), pygame.RESIZABLE
         )
         pygame.display.set_caption("Wavelength")
         self.base_surface = pygame.Surface((WIDTH, HEIGHT))
@@ -442,6 +454,14 @@ class JuegoWavelength:
         scaled = pygame.transform.smoothscale(self.base_surface, (nuevo_w, nuevo_h))
         self.screen.fill((0, 0, 0))
         self.screen.blit(scaled, (off_x, off_y))
+
+        # --- DEBUG TEMPORAL: quitar en cuanto quede claro el problema de nitidez ---
+        debug_txt = f"{self.debug_info} | screen.get_size()={self.screen.get_size()}"
+        debug_surf = self.font_small.render(debug_txt, True, (0, 255, 0))
+        pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, debug_surf.get_width() + 10, 30))
+        self.screen.blit(debug_surf, (5, 5))
+        # --- FIN DEBUG TEMPORAL ---
+
         pygame.display.flip()
 
     def render_text_centered(self, text, font, color, y):
