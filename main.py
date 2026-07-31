@@ -249,6 +249,7 @@ class JuegoWavelength:
         self.num_equipos = 2
         self.num_rondas = 5
         self.campos_nombres = []
+        self.btn_pantalla_completa = Boton((15, 15, 230, 48), "PANTALLA COMPLETA", self.font_small)
         self._construir_setup()
 
     def _load_font(self, size, bold=False):
@@ -285,6 +286,7 @@ class JuegoWavelength:
 
     def draw_setup(self):
         self.base_surface.fill((30, 30, 40))
+        self.btn_pantalla_completa.draw(self.base_surface)
         self.render_text_centered("Configuración de la partida", self.font_title, (240, 240, 240), 40)
 
         self.render_text_centered(f"Nº de equipos: {self.num_equipos}", self.font_med, (240, 240, 240), 175)
@@ -401,6 +403,7 @@ class JuegoWavelength:
 
     def draw_ui(self):
         self.base_surface.fill((30, 30, 40))
+        self.btn_pantalla_completa.draw(self.base_surface)
 
         px = WIDTH - 350
         pygame.draw.rect(self.base_surface, (45, 45, 55), (px, 20, 330, 120+len(self.equipos)*50), border_radius=15)
@@ -447,6 +450,28 @@ class JuegoWavelength:
 
         self._blit_a_pantalla()
 
+    def _alternar_pantalla_completa(self):
+        """Activa/desactiva pantalla completa (esconde la barra de direcciones
+        del navegador y demás UI, ganando espacio real para jugar). Si el
+        navegador lo permite, intenta además bloquear la orientación en
+        horizontal — no todos lo soportan (p.ej. Safari en iPhone no deja
+        bloquear orientación fuera de una PWA instalada), así que es un
+        intento "si se puede, mejor" y no falla si no está disponible."""
+        if sys.platform not in ("emscripten", "wasi"):
+            return
+        try:
+            from platform import document, window
+            if document.fullscreenElement:
+                document.exitFullscreen()
+            else:
+                window.canvas.requestFullscreen()
+                try:
+                    window.screen.orientation.lock("landscape")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def _reafirmar_resolucion_web(self):
         """Vuelve a forzar el tamaño/proporción correctos del <canvas> si algo
         (p. ej. la plantilla de pygbag tras un evento de resize, o al rotar el
@@ -490,17 +515,6 @@ class JuegoWavelength:
         scaled = pygame.transform.smoothscale(self.base_surface, (nuevo_w, nuevo_h))
         self.screen.fill((0, 0, 0))
         self.screen.blit(scaled, (off_x, off_y))
-
-        # --- DEBUG TEMPORAL: quitar en cuanto quede claro el problema de nitidez ---
-        if not hasattr(self, '_debug_font'):
-            self._debug_font = pygame.font.Font(FONT_REG_PATH, 15)
-        linea1 = self.debug_info
-        linea2 = f"screen.get_size()={self.screen.get_size()}"
-        for i, linea in enumerate([linea1, linea2]):
-            debug_surf = self._debug_font.render(linea, True, (0, 255, 0))
-            pygame.draw.rect(self.screen, (0, 0, 0), (0, i*20, debug_surf.get_width() + 10, 20))
-            self.screen.blit(debug_surf, (5, i*20 + 2))
-        # --- FIN DEBUG TEMPORAL ---
 
         pygame.display.flip()
 
@@ -550,6 +564,10 @@ class JuegoWavelength:
                     pos_img = self._pos_a_coords_imagen(event.pos)
                 else:
                     pos_img = None
+
+                if event.type == pygame.MOUSEBUTTONDOWN and pos_img and self.btn_pantalla_completa.clicked(pos_img):
+                    self._alternar_pantalla_completa()
+                    continue
 
                 if self.fase == 'SETUP':
                     self.handle_setup_event(event, pos_img)
