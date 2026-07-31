@@ -202,19 +202,30 @@ class JuegoWavelength:
         if sys.platform in ("emscripten", "wasi"):
             try:
                 from platform import window
+                canvas = window.canvas
                 dpr = float(window.devicePixelRatio) or 1.0
+                dpr_usado = min(dpr, 3.0)
                 css_w = float(window.innerWidth)
                 css_h = float(window.innerHeight)
-                dpr_usado = min(dpr, 3.0)
+
+                # La plantilla por defecto de pygbag fija el <canvas> a un
+                # tamaño/proporción genérico por CSS (a menudo cuadrado),
+                # que pisa lo que pidamos desde Python. Lo sobrescribimos
+                # explícitamente para que ocupe el hueco real disponible.
+                canvas.style.width = f"{css_w}px"
+                canvas.style.height = f"{css_h}px"
+                try:
+                    canvas.style.aspectRatio = "auto"
+                except Exception:
+                    pass
+
                 base_w, base_h = css_w, css_h
                 self.debug_info = (
-                    f"dpr={dpr:.2f} (usado={dpr_usado:.2f}) "
-                    f"viewport_css={int(css_w)}x{int(css_h)} "
-                    f"-> canvas={int(css_w*dpr_usado)}x{int(css_h*dpr_usado)}"
+                    f"dpr={dpr:.2f}(u={dpr_usado:.2f}) vp={int(css_w)}x{int(css_h)}"
                 )
                 dpr = dpr_usado
             except Exception as e:
-                self.debug_info = f"error leyendo window: {e!r}"
+                self.debug_info = f"error: {e!r}"
                 dpr = 1.0
 
         # En navegador no existe el concepto de "resolución de escritorio",
@@ -436,6 +447,31 @@ class JuegoWavelength:
 
         self._blit_a_pantalla()
 
+    def _reafirmar_resolucion_web(self):
+        """Vuelve a forzar el tamaño/proporción correctos del <canvas> si algo
+        (p. ej. la plantilla de pygbag tras un evento de resize, o al rotar el
+        móvil) intentó imponer su tamaño por defecto de nuevo."""
+        if sys.platform not in ("emscripten", "wasi"):
+            return
+        try:
+            from platform import window
+            canvas = window.canvas
+            dpr = min(float(window.devicePixelRatio) or 1.0, 3.0)
+            css_w = float(window.innerWidth)
+            css_h = float(window.innerHeight)
+            objetivo = (max(320, int(css_w * dpr)), max(240, int(css_h * dpr)))
+            if objetivo != self.screen.get_size():
+                canvas.style.width = f"{css_w}px"
+                canvas.style.height = f"{css_h}px"
+                try:
+                    canvas.style.aspectRatio = "auto"
+                except Exception:
+                    pass
+                self.screen = pygame.display.set_mode(objetivo, pygame.RESIZABLE)
+                self.debug_info = f"REAJUSTADO dpr={dpr:.2f} vp={int(css_w)}x{int(css_h)}"
+        except Exception:
+            pass
+
     def _calcular_escala(self):
         """Calcula el factor de escala y el desplazamiento (offset) para dibujar
         la superficie base (WIDTH x HEIGHT) centrada dentro de la ventana real,
@@ -500,7 +536,11 @@ class JuegoWavelength:
 
     async def run(self):
         dragging = False
+        frame_num = 0
         while True:
+            frame_num += 1
+            if frame_num % 30 == 0:
+                self._reafirmar_resolucion_web()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
